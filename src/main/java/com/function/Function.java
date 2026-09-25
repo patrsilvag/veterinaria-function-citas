@@ -29,17 +29,15 @@ public class Function {
             DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
 
     // ==================================================
-    // FUNCIÓN PRINCIPAL
+    // CREAR CITA
+    // POST /api/citas
     // ==================================================
 
     @FunctionName("Citas")
-    public HttpResponseMessage run(@HttpTrigger(name = "req",
-            methods = {HttpMethod.POST, HttpMethod.PUT}, authLevel = AuthorizationLevel.ANONYMOUS,
-            route = "citas/{idCita?}/{accion?}") HttpRequestMessage<Optional<String>> request,
-
-            @BindingName("idCita") String idCita,
-
-            @BindingName("accion") String accion,
+    public HttpResponseMessage crearCita(
+            @HttpTrigger(name = "req", methods = {HttpMethod.POST},
+                    authLevel = AuthorizationLevel.ANONYMOUS,
+                    route = "citas") HttpRequestMessage<Optional<String>> request,
 
             final ExecutionContext context) {
 
@@ -48,47 +46,7 @@ public class Function {
         try {
 
             // ==================================================
-            // PUT /api/citas/{idCita}/confirmar
-            // PUT /api/citas/{idCita}/cancelar
-            // ==================================================
-
-            if (request.getHttpMethod() == HttpMethod.PUT) {
-
-                if (idCita == null || idCita.isBlank()) {
-                    return request.createResponseBuilder(HttpStatus.BAD_REQUEST)
-                            .body("El idCita es obligatorio.").build();
-                }
-
-                if (accion == null || accion.isBlank()) {
-                    return request.createResponseBuilder(HttpStatus.BAD_REQUEST)
-                            .body("La acción es obligatoria.").build();
-                }
-
-                long id;
-
-                try {
-                    id = Long.parseLong(idCita);
-
-                } catch (NumberFormatException e) {
-
-                    return request.createResponseBuilder(HttpStatus.BAD_REQUEST)
-                            .body("El idCita debe ser numérico.").build();
-                }
-
-                if ("confirmar".equalsIgnoreCase(accion)) {
-                    return confirmarCita(request, context, id);
-                }
-
-                if ("cancelar".equalsIgnoreCase(accion)) {
-                    return cancelarCita(request, context, id);
-                }
-
-                return request.createResponseBuilder(HttpStatus.NOT_FOUND)
-                        .body("Acción no válida. Use confirmar o cancelar.").build();
-            }
-
-            // ==================================================
-            // POST /api/citas
+            // VALIDAR BODY
             // ==================================================
 
             if (request.getBody().isEmpty() || request.getBody().get().isBlank()) {
@@ -98,6 +56,10 @@ public class Function {
             }
 
             String body = request.getBody().get();
+
+            // ==================================================
+            // OBTENER DATOS
+            // ==================================================
 
             String fechaCita = obtenerValorString(body, "fechaCita");
             Long idUsuario = obtenerValorLong(body, "idUsuario");
@@ -207,6 +169,7 @@ public class Function {
                 try (ResultSet generatedKeys = statement.getGeneratedKeys()) {
 
                     if (generatedKeys.next()) {
+
                         nuevoIdCita = generatedKeys.getLong(1);
                     }
                 }
@@ -247,6 +210,97 @@ public class Function {
 
             return request.createResponseBuilder(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Error interno al procesar la cita.").build();
+        }
+    }
+
+    // ==================================================
+    // CONFIRMAR / CANCELAR CITA
+    // PUT /api/citas/{idcita}/{accion}
+    // ==================================================
+
+    @FunctionName("CitasAccion")
+    public HttpResponseMessage ejecutarAccionCita(
+            @HttpTrigger(name = "req", methods = {HttpMethod.PUT},
+                    authLevel = AuthorizationLevel.ANONYMOUS,
+                    route = "citas/{idcita}/{accion}") HttpRequestMessage<Optional<String>> request,
+
+            @BindingName("idcita") String idCita,
+
+            @BindingName("accion") String accion,
+
+            final ExecutionContext context) {
+
+        context.getLogger().info("Function CitasAccion ejecutada.");
+
+        try {
+
+            // ==================================================
+            // VALIDAR ID
+            // ==================================================
+
+            if (idCita == null || idCita.isBlank()) {
+
+                return request.createResponseBuilder(HttpStatus.BAD_REQUEST)
+                        .body("El idCita es obligatorio.").build();
+            }
+
+            // ==================================================
+            // VALIDAR ACCIÓN
+            // ==================================================
+
+            if (accion == null || accion.isBlank()) {
+
+                return request.createResponseBuilder(HttpStatus.BAD_REQUEST)
+                        .body("La acción es obligatoria.").build();
+            }
+
+            // ==================================================
+            // CONVERTIR ID
+            // ==================================================
+
+            long id;
+
+            try {
+
+                id = Long.parseLong(idCita);
+
+            } catch (NumberFormatException e) {
+
+                return request.createResponseBuilder(HttpStatus.BAD_REQUEST)
+                        .body("El idCita debe ser numérico.").build();
+            }
+
+            // ==================================================
+            // CONFIRMAR
+            // ==================================================
+
+            if ("confirmar".equalsIgnoreCase(accion)) {
+
+                return confirmarCita(request, context, id);
+            }
+
+            // ==================================================
+            // CANCELAR
+            // ==================================================
+
+            if ("cancelar".equalsIgnoreCase(accion)) {
+
+                return cancelarCita(request, context, id);
+            }
+
+            // ==================================================
+            // ACCIÓN NO VÁLIDA
+            // ==================================================
+
+            return request.createResponseBuilder(HttpStatus.NOT_FOUND)
+                    .body("Acción no válida. Use confirmar o cancelar.").build();
+
+        } catch (Exception e) {
+
+            context.getLogger().severe("Error procesando acción de cita: " + e.getMessage());
+
+            return request.createResponseBuilder(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error interno al procesar la acción de la cita.").build();
         }
     }
 
@@ -347,6 +401,10 @@ public class Function {
 
                 publicarEventoCitaConfirmada(idCita, fechaCita, idUsuario, idCliente, idMascota,
                         context);
+
+                // ==================================================
+                // RESPUESTA
+                // ==================================================
 
                 String response = String.format("""
                         {
@@ -464,6 +522,10 @@ public class Function {
 
                 publicarEventoCitaCancelada(idCita, fechaCita, idUsuario, idCliente, idMascota,
                         context);
+
+                // ==================================================
+                // RESPUESTA
+                // ==================================================
 
                 String response = String.format("""
                         {
@@ -620,6 +682,7 @@ public class Function {
         java.util.regex.Matcher matcher = pattern.matcher(json);
 
         if (matcher.find()) {
+
             return matcher.group(1);
         }
 

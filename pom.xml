@@ -88,6 +88,31 @@
                     <encoding>${project.build.sourceEncoding}</encoding>
                 </configuration>
             </plugin>
+            <!--  Copiar Wallet al paquete de Azure  -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
+                <version>3.3.1</version>
+                <executions>
+                    <execution>
+                        <id>copy-wallets</id>
+                        <phase>prepare-package</phase>
+                        <goals>
+                            <goal>copy-resources</goal>
+                        </goals>
+                        <configuration>
+                            <outputDirectory>
+                                ${project.build.directory}/azure-functions/${functionAppName}/wallets </outputDirectory>
+                            <resources>
+                                <resource>
+                                    <directory>${project.basedir}/wallets</directory>
+                                    <filtering>false</filtering>
+                                </resource>
+                            </resources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <groupId>com.microsoft.azure</groupId>
                 <artifactId>azure-functions-maven-plugin</artifactId>
@@ -96,14 +121,14 @@
                     <!-- function app name -->
                     <appName>${functionAppName}</appName>
                     <!-- function app resource group -->
-                    <resourceGroup>java-functions-group</resourceGroup>
+                    <resourceGroup>gr-psilva-veterinaria</resourceGroup>
                     <!-- function app region-->
                     <!-- refers
                     https://github.com/microsoft/azure-maven-plugins/wiki/Azure-Functions:-Configuration-Details#supported-regions
                     for all valid values -->
-                    <region>westus</region>
+                    <region>westus3</region>
                     <!-- function app service plan name -->
-                    <appServicePlanName>java-functions-app-service-plan</appServicePlanName>
+                    <appServicePlanName>ASP-grpsilvaveterinaria-8d80</appServicePlanName>
                     <!-- function pricingTier, default to be consumption if not specified -->
                     <!-- refers
                     https://github.com/microsoft/azure-maven-plugins/wiki/Azure-Functions:-Configuration-Details#supported-pricing-tiers
@@ -120,6 +145,9 @@
                         <!-- runtime Java version, could be 8, 11, 17, 21 (default) -->
                         <javaVersion>21</javaVersion>
                     </runtime>
+                    <!--  Puerto local  -->
+                    <funcPort>7074</funcPort>
+                    <!--  Configuración Azure Functions  -->
                     <appSettings>
                         <property>
                             <name>FUNCTIONS_EXTENSION_VERSION</name>
